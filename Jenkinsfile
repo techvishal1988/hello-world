@@ -28,8 +28,8 @@ pipeline {
         stage("build code") {
             steps {
                 sshagent(['deploy_user']) {
-                    scp /var/lib/jenkins/workspace/artifact-pull-nexus/devops.war ec2-user@3.21.163.152:/opt
-
+                    scp /var/lib/jenkins/workspace/maven-project-nexus/webapp/target/webapp.war ec2-user@3.21.163.152:/opt
+                }
 }
         stage("Publish to Nexus Repository Manager") {
             steps {
