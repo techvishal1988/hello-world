@@ -21,8 +21,7 @@ pipeline {
         }
         stage("Maven Build") {
             steps {
-                script {
-                    sh "mvn package -DskipTests=true"
+                    sh "mvn clean install"
                 }
             }
         }
@@ -31,7 +30,6 @@ pipeline {
                 sshagent(['deploy_user']) {
                     scp /var/lib/jenkins/workspace/artifact-pull-nexus/devops.war ec2-user@3.21.163.152:/opt
 
-    // some block
 }
         stage("Publish to Nexus Repository Manager") {
             steps {
