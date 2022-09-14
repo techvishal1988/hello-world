@@ -1,0 +1,104 @@
+name: CI
+on:
+  push:
+    branches: ["main"]
+env:
+   ECR_REG: 026650291775.dkr.ecr.ap-southeast-1.amazonaws.com/awst-io
+      
+  
+jobs:
+  build:
+    name: Build and Pushing the Image
+    runs-on: ubuntu-latest
+    outputs:
+      output1: ${{steps.build-image.outputs.image }}
+                      
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          repository: awst-global/api.awst.io-environment
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+           
+        run: |
+          docker build -t ${{ env.ECR_REG }}:$GITHUB_SHA .
+          docker push ${{ env.ECR_REG }}:$GITHUB_SHA
+          echo "::set-output name=image::$GITHUB_SHA"
+          
+  deploy-development:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name != 'pull_request'
+    environment: development
+    
+    steps:
+      - name: Fetching the deployment repo
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          event-type: build
+          workflow: CD
+          repository: awst-global/api.awst.io-environment
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          client-payload: '{"image_name": "${{ env.ECR_REG }}", "image_tag": "${{needs.build.outputs.output1}}", "app_repo": "wallet-awst-io", "env_name": "dev"}'
+         
+
+  deploy-qa:
+    runs-on: ubuntu-latest
+    needs: [build,deploy-development]
+    if: github.event_name != 'pull_request'
+    environment: qa
+        
+    steps:
+      - name: Fetching the deployment repo
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          event-type: build
+          workflow: CD
+          # workflow: CD-TESTING
+          repository: awst-global/api.awst.io-environment
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          client-payload: '{"image_name": "${{ env.ECR_REG }}", "image_tag": "${{needs.build.outputs.output1}}", "app_repo": "wallet-awst-io-qa", "env_name": "qa"}'
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: [build,deploy-qa]
+    if: github.event_name != 'pull_request'
+    environment: staging
+    
+    steps:
+      - name: Fetching the deployment repo
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          event-type: build
+          workflow: CD
+          repository: awst-global/api.awst.io-environment
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          client-payload: '{"image_name": "${{ env.ECR_REG }}", "image_tag": "${{needs.build.outputs.output1}}", "app_repo": "wallet-awst-io-staging", "env_name": "staging"}'
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [build,deploy-staging]
+    if: github.event_name != 'pull_request'
+    environment: production
+    
+    steps:
+      - name: Fetching the deployment repo
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          event-type: build
+          # workflow: CD
+          repository: awst-global/api.awst.io-environment
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          client-payload: '{"image_name": "${{ env.ECR_REG }}", "image_tag": "${{needs.build.outputs.output1}}", "app_repo": "wallet-awst-io-prod", "env_name": "prod"}'
