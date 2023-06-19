@@ -5,6 +5,7 @@ on:
 env:
    ECR_REG: 026650291775.dkr.ecr.ap-southeast-1.amazonaws.com/awst-io
       
+
   
 jobs:
   build:
